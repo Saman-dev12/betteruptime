@@ -1,0 +1,59 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String     @id @default(cuid())
+  clerkId     String     @unique
+  email       String     @unique
+  firstName   String?
+  lastName    String?
+  imageUrl    String?
+  username    String?    @unique
+  monitors    Monitor[]
+  alerts      Alert[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Monitor {
+  id              String     @id @default(cuid())
+  name            String
+  url             String
+  frequency       Int        // in seconds (e.g. 60 = check every minute)
+  userId          String
+  user            User       @relation(fields: [userId], references: [id])
+  results         Result[]
+  alerts          Alert[]
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
+
+model Result {
+  id            Int        @id @default(autoincrement())
+  monitorId     String
+  monitor       Monitor    @relation(fields: [monitorId], references: [id])
+  status        Int
+  statusText    String
+  responseTime  Int        // in ms
+  checkedAt     DateTime   @default(now())
+  isUp          Boolean
+  error         String?
+}
+
+model Alert {
+  id            String     @id @default(cuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id])
+  monitorId     String
+  monitor       Monitor    @relation(fields: [monitorId], references: [id])
+  email         String     // Alert email address
+  createdAt     DateTime   @default(now())
+}
+
