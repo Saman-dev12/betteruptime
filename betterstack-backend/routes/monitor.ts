@@ -2,6 +2,7 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import { clerkAuthMiddleware } from "../middleware/auth-middleware";
 import prisma from "../utils/prisma"; 
+import {monitorQueue} from "../utils/monitorQueue"
 
 const router = Router();
 
@@ -63,18 +64,29 @@ router.delete("/delete/:id", clerkAuthMiddleware, async (req: Request, res: Resp
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-     await prisma.monitor.delete({
+    const monitor = await prisma.monitor.findFirst({
       where: {
         id: id,
-        userId: userId, 
+        userId: userId,
       },
     });
 
+    if (!monitor) {
+      return res.status(404).json({ message: "Monitor not found" });
+    }
 
-    res.status(200).json({ message: "Monitor deleted successfully" });
+
+    await monitorQueue.removeJobScheduler(`monitor-${id}`);
+
+
+    await prisma.monitor.delete({
+      where: { id: id },
+    });
+
+    res.status(200).json({ message: "Monitor deleted and job removed" });
 
   } catch (e) {
-      console.error("Failed to delete monitor:", e);
+    console.error("Failed to delete monitor:", e);
     res.status(500).json({ message: "Internal Server Error" });
   }
 });
@@ -100,6 +112,18 @@ router.post("/add",clerkAuthMiddleware,async (req: Request, res: Response) => {
         },
       },
     });
+
+    await monitorQueue.upsertJobScheduler(
+  `monitor-${monitor.id}`,         
+  { every: frequency * 60_000 },  
+  {
+    name: 'check-monitor',
+    data: { id: monitor.id, url: monitor.url },
+    opts: { removeOnComplete: true, removeOnFail: true },
+  }
+);
+
+
 
     res.status(201).json({ monitor });
   } catch (e) {

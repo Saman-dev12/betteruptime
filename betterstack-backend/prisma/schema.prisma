@@ -16,8 +16,8 @@ model User {
   lastName    String?
   imageUrl    String?
   username    String?    @unique
-  monitors    Monitor[]
-  alerts      Alert[]
+  monitors    Monitor[]  @relation("UserMonitors")
+  alerts      Alert[]    @relation("UserAlerts")
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 }
@@ -28,9 +28,9 @@ model Monitor {
   url             String
   frequency       Int        
   userId          String
-  user            User       @relation(fields: [userId], references: [id])
-  results         Result[]
-  alerts          Alert[]
+  user            User       @relation("UserMonitors", fields: [userId], references: [id])
+  results         Result[]   @relation("MonitorResults")
+  alerts          Alert[]    @relation("MonitorAlerts")
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 }
@@ -38,7 +38,7 @@ model Monitor {
 model Result {
   id            Int        @id @default(autoincrement())
   monitorId     String
-  monitor       Monitor    @relation(fields: [monitorId], references: [id])
+  monitor       Monitor    @relation("MonitorResults", fields: [monitorId], references: [id], onDelete: Cascade)
   status        Int
   statusText    String
   responseTime  Int        // in ms
@@ -50,9 +50,9 @@ model Result {
 model Alert {
   id            String     @id @default(cuid())
   userId        String
-  user          User       @relation(fields: [userId], references: [id])
+  user          User       @relation("UserAlerts", fields: [userId], references: [id])
   monitorId     String
-  monitor       Monitor    @relation(fields: [monitorId], references: [id])
+  monitor       Monitor    @relation("MonitorAlerts", fields: [monitorId], references: [id], onDelete: Cascade)
   email         String     // Alert email address
   createdAt     DateTime   @default(now())
 }
