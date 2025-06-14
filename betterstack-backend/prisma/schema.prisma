@@ -26,7 +26,7 @@ model Monitor {
   id              String     @id @default(cuid())
   name            String
   url             String
-  frequency       Int        // in seconds (e.g. 60 = check every minute)
+  frequency       Int        
   userId          String
   user            User       @relation(fields: [userId], references: [id])
   results         Result[]

@@ -2,6 +2,7 @@ import {Router} from "express"
 import {Webhook} from "svix"
 import type { WebhookEvent } from '@clerk/backend'
 import prisma from "../utils/prisma"
+import type { Request, Response } from "express"
 
 
 const router = Router();
