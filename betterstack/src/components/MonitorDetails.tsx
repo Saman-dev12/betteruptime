@@ -1,28 +1,80 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts"
-import { Activity, Clock, Play, Settings, TrendingUp, AlertTriangle, CheckCircle } from "lucide-react"
+import {
+  Activity,
+  Clock,
+  Play,
+  Settings,
+  TrendingUp,
+  AlertTriangle,
+  CheckCircle,
+  ArrowLeft,
+  Loader2,
+  Calendar,
+  Globe,
+  Zap,
+} from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-
+import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 
 export default function MonitorDetailPage({ monitor,responseTime,uptime,logs }) {
   const [selectedPeriod, setSelectedPeriod] = useState("24h")
   const [isTestingNow, setIsTestingNow] = useState(false)
+    const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+    const router = useRouter()
+
   
 
-  const testNow = async () => {
+ const testNow = async () => {
     setIsTestingNow(true)
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-    setIsTestingNow(false)
+    try {
+      // Call your test endpoint here
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+
+    } catch (err) {
+      console.error("Test failed:", err)
+    } finally {
+      setIsTestingNow(false)
+    }
   }
+
+  const formatChartTime = (timestamp: string) => {
+    return new Date(timestamp).toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+  }
+
+  const formatTime = (timestamp: string) => {
+    return new Date(timestamp).toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    })
+  }
+
+
+  const getStatusColor = (status: string) => {
+    return status === "up"
+      ? "bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900 dark:text-green-100"
+      : "bg-red-100 text-red-800 hover:bg-red-100 dark:bg-red-900 dark:text-red-100"
+  }
+
+
+
 
   return (
     <div className="space-y-6">
@@ -108,7 +160,10 @@ export default function MonitorDetailPage({ monitor,responseTime,uptime,logs }) 
             <Activity className="h-4 w-4 text-orange-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-900 dark:text-orange-100">{monitor.frequency}</div>
+            <div className="text-2xl font-bold text-orange-900 dark:text-orange-100">
+  {monitor.frequency}
+</div>
+
             <p className="text-xs text-orange-600 dark:text-orange-400">Monitoring interval</p>
           </CardContent>
         </Card>
@@ -214,11 +269,12 @@ export default function MonitorDetailPage({ monitor,responseTime,uptime,logs }) 
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={uptime}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-700" />
-                    <XAxis dataKey="time" className="text-slate-600 dark:text-slate-400" />
+                    <XAxis dataKey="time" className="text-slate-600 dark:text-slate-400" tick={{ fontSize: 12 }} />
                     <YAxis
                       className="text-slate-600 dark:text-slate-400"
-                      domain={[99, 100]}
+                      domain={[0, 100]}
                       label={{ value: "Uptime (%)", angle: -90, position: "insideLeft" }}
+                      tick={{ fontSize: 12 }}
                     />
                     <Tooltip
                       contentStyle={{
@@ -227,17 +283,19 @@ export default function MonitorDetailPage({ monitor,responseTime,uptime,logs }) 
                         borderRadius: "8px",
                         boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
                       }}
+                      labelFormatter={(value) => `Time: ${value}`}
+                      formatter={(value) => [`${value}%`, "Uptime"]}
                     />
                     <Area
                       type="monotone"
                       dataKey="uptime"
                       stroke="#10b981"
                       fill="url(#uptimeGradient)"
-                      strokeWidth={2}
+                      strokeWidth={3}
                     />
                     <defs>
                       <linearGradient id="uptimeGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
                         <stop offset="95%" stopColor="#10b981" stopOpacity={0.1} />
                       </linearGradient>
                     </defs>
@@ -266,39 +324,35 @@ export default function MonitorDetailPage({ monitor,responseTime,uptime,logs }) 
                 </TableHeader>
                 <TableBody>
                   {logs.map((log) => (
-                    <TableRow key={log.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
-                      <TableCell className="font-mono text-sm">{log.timestamp}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={log.isUp ? "default" : "destructive"}
-                          className={
-                            log.isUp
-                              ? "bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900 dark:text-green-100"
-                              : "bg-red-100 text-red-800 hover:bg-red-100 dark:bg-red-900 dark:text-red-100"
-                          }
-                        >
-                          {log.status} {log.statusText}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{log.isUp ? `${log.responseTime}ms` : "—"}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {log.isUp ? (
-                            <CheckCircle className="h-4 w-4 text-green-600" />
-                          ) : (
-                            <AlertTriangle className="h-4 w-4 text-red-600" />
-                          )}
-                          <span
-                            className={
-                              log.isUp ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"
-                            }
+                      <TableRow key={log.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
+                        <TableCell className="font-mono text-sm">{formatTime(log.timestamp)}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={log.isUp ? "default" : "destructive"}
+                            className={getStatusColor(log.isUp ? "up" : "down")}
                           >
-                            {log.isUp ? "Success" : "Failed"}
-                          </span>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                            {log.status} {log.statusText}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-mono">{log.isUp ? `${log.responseTime}ms` : "—"}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {log.isUp ? (
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                            ) : (
+                              <AlertTriangle className="h-4 w-4 text-red-600" />
+                            )}
+                            <span
+                              className={
+                                log.isUp ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"
+                              }
+                            >
+                              {log.isUp ? "Success" : "Failed"}
+                            </span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                 </TableBody>
               </Table>
             </CardContent>

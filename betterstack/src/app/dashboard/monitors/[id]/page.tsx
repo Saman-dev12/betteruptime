@@ -1,7 +1,8 @@
 import MonitorDetailPage from "@/components/MonitorDetails.tsx"
 import {getMonitor} from "@/actions/monitors"
 export default async function MonitorDetail({ params }: { params: { id: string } }) {
-  const { monitor, logs, responseTimeData, uptimeData } = await getMonitor(params.id)
+  const {id} = await params
+  const { monitor, logs, responseTimeData, uptimeData } = await getMonitor(id)
 
   return (
     <MonitorDetailPage

@@ -77,27 +77,26 @@ router.get("/get-one/:id", clerkAuthMiddleware, async (req: Request, res: Respon
 });
 
 
-router.get("/summary/:id", clerkAuthMiddleware, async (req: Request, res: Response) => {
-  
-    const { id } = req.params;
-    const userId = req.user?.id;
+router.get("/summary/:id", clerkAuthMiddleware, async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user?.id;
 
-    if (!userId) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
+  if (!userId) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
 
-     try {
+  try {
     const monitor = await prisma.monitor.findFirst({
-      where: { id: id, userId },
+      where: { id, userId },
     });
 
     if (!monitor) {
-      return res.status(404).json({ error: 'Monitor not found' });
+      return res.status(404).json({ error: "Monitor not found" });
     }
 
     const logs = await prisma.result.findMany({
-      where: { monitorId:id },
-      orderBy: { checkedAt: 'desc' },
+      where: { monitorId: id },
+      orderBy: { checkedAt: "desc" },
       take: 50,
     });
 
@@ -108,50 +107,66 @@ router.get("/summary/:id", clerkAuthMiddleware, async (req: Request, res: Respon
 
     const [last24h, last7d, last30d] = await Promise.all([
       prisma.result.findMany({
-        where: { monitorId:id , checkedAt: { gte: cutoff24h } },
+        where: { monitorId: id, checkedAt: { gte: cutoff24h } },
       }),
       prisma.result.findMany({
-        where: { monitorId:id , checkedAt: { gte: cutoff7d } },
+        where: { monitorId: id, checkedAt: { gte: cutoff7d } },
       }),
       prisma.result.findMany({
-        where: { monitorId:id , checkedAt: { gte: cutoff30d } },
+        where: { monitorId: id, checkedAt: { gte: cutoff30d } },
       }),
     ]);
 
     const calcUptime = (results) => {
       if (results.length === 0) return 0;
-      const upCount = results.filter(r => r.isUp).length;
+      const upCount = results.filter((r) => r.isUp).length;
       return parseFloat(((upCount / results.length) * 100).toFixed(2));
     };
 
-    const responseTimeData = logs.map((r) => ({
-      time: r.checkedAt.toISOString().slice(11, 16),
-      responseTime: r.responseTime,
-    }));
+    const formatTimeForChart = (date) => {
+      const d = new Date(date);
+      return `${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`;
+    };
 
-    const uptimeData = logs.map((r) => ({
-      time: r.checkedAt.toISOString().slice(11, 16),
-      uptime: r.isUp ? 100 : 0,
-    }));
+    const responseTimeData = logs
+      .map((r) => ({
+        time: formatTimeForChart(r.checkedAt),
+        responseTime: r.responseTime,
+        fullTimestamp: r.checkedAt.toISOString(),
+      }))
+      .reverse();
+
+    const uptimeData = logs
+      .map((r) => ({
+        time: formatTimeForChart(r.checkedAt),
+        uptime: r.isUp ? 100 : 0,
+        fullTimestamp: r.checkedAt.toISOString(),
+      }))
+      .reverse();
+
+    const formatFrequency = (freqInSec) => {
+      if (freqInSec < 60) return `${freqInSec} seconds`;
+      const minutes = freqInSec / 60;
+      return minutes === 60 ? `1 hour` : `${minutes} minutes`;
+    };
 
     const response = {
       monitor: {
         id: monitor.id,
         name: monitor.name,
         url: monitor.url,
-        status: logs[0]?.isUp ? 'up' : 'down',
+        status: logs[0]?.isUp ? "up" : "down",
         responseTime: logs[0]?.responseTime || 0,
-        lastChecked: logs[0]?.checkedAt.toISOString() || '',
-        frequency: `${monitor.frequency} minutes`,
-        enabled: true,
+        lastChecked: logs[0]?.checkedAt.toISOString() || "",
+        frequency: formatFrequency(monitor.frequency),
         uptime24h: calcUptime(last24h),
         uptime7d: calcUptime(last7d),
         uptime30d: calcUptime(last30d),
-        createdAt: monitor.createdAt.toISOString().split('T')[0],
+        createdAt: monitor.createdAt.toISOString().split("T")[0],
       },
-      logs: logs.map(r => ({
+      logs: logs.map((r) => ({
         id: r.id,
-        timestamp: r.checkedAt.toISOString().replace('T', ' ').slice(0, 19),
+        timestamp: r.checkedAt.toISOString(),
         status: r.status,
         statusText: r.statusText,
         responseTime: r.responseTime,
@@ -162,13 +177,10 @@ router.get("/summary/:id", clerkAuthMiddleware, async (req: Request, res: Respon
     };
 
     return res.json(response);
-
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Something went wrong' });
+    console.error("Summary API error:", err);
+    return res.status(500).json({ error: "Something went wrong" });
   }
-
-    
 });
 
 
